@@ -49,7 +49,6 @@ def strainNeedSearch(strain_df):
     """
         返回所有需要查找的菌属
     """
-    
     strain_need_search = []
     for i in range(1, len(strain_df)):
         strain_item = strain_df.iloc[i]
@@ -113,6 +112,7 @@ def saveOTUsNeedSearch(OTUs_need_search, folder):
 	with open('./dataset/%s/OTUs_need_search.json' %(folder),'w') as outfile:
 		json.dump(OTUs_need_search, outfile)
 		outfile.write('\n')
+	outfile.close()
 
 
 def saveFastaNeedSearch(fasta_need_search, folder):
@@ -122,8 +122,7 @@ def saveFastaNeedSearch(fasta_need_search, folder):
 	with open('./dataset/%s/fasta_need_search.json' %(folder),'w') as outfile:
 		json.dump(fasta_need_search, outfile)       
 		outfile.write('\n')
-
-
+	outfile.close()
 
 
 def main(folder):
@@ -144,6 +143,7 @@ def main(folder):
 	saveOTUsNeedSearch(OTUs_need_search, folder)
 	saveFastaNeedSearch(fasta_need_search, folder)
 	print('已保存数据文件')
+
 
 if __name__=="__main__":
 	main(input('请输入数据集名: '))
