@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This repo is doing data preparation for SUNXING's graduate design.  All source code are contained in `src` folder. 
+This repo is used to get genus names by sequencing matching using [Ribosomal Database Project (RDP)](http://rdp.cme.msu.edu/seqmatch/seqmatch_intro.jsp). All source code are contained in `src` folder. 
 
 - `dataset`: a directory to store the original dataset as well as the code generated files.
 - `img`: a directory to store images used in `Searching Data.ipynb`, in order to describe the workflow.
@@ -10,7 +10,7 @@ This repo is doing data preparation for SUNXING's graduate design.  All source c
 - `processData.py`: process data in dataset. This would generate two `txt` files in each own dataset: 
   - `OTUs_need_search.txt`: store the strain names and their OTUs that need search.
   - `fasta_need_search.txt`: store the strain names and their gene sequences that need search.
-- `searchSeqID.py`: search the gene sequences stored in `fasta_need_search.txt` on [Ribosomal Database Project (RDP)](http://rdp.cme.msu.edu/seqmatch/seqmatch_intro.jsp), get sequence IDs that have match scores greater than 0.95, and store the sequence IDs in `seq_id_searched.txt` in dataset.
+- `searchSeqID.py`: search the gene sequences stored in `fasta_need_search.txt` on RDP, get sequence IDs that have match scores greater than 0.95, and store the sequence IDs in `seq_id_searched.txt` in dataset.
 - `extractData.py`: extract sequence IDs from `seq_id_searched.txt`, search the genus of each `sequence ID`, and store results in `best_match_strain.xlsx`.
 
 ## Usage
