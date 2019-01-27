@@ -109,9 +109,9 @@ def saveOTUsNeedSearch(OTUs_need_search, folder):
 	"""
 		将 OTUs_need_search 保存至json文件
 	"""
-	with open('./dataset/%s/OTUs_need_search.json' %(folder),'w') as outfile:
-		json.dump(OTUs_need_search, outfile)
-		outfile.write('\n')
+	with open('./dataset/%s/OTUs_need_search.txt' %(folder),'w') as outfile:
+		# json.dump(OTUs_need_search, outfile)
+		outfile.write(str(OTUs_need_search))
 	outfile.close()
 
 
@@ -119,9 +119,9 @@ def saveFastaNeedSearch(fasta_need_search, folder):
 	"""
 		将 fasta_need_search 保存至json文件
 	"""
-	with open('./dataset/%s/fasta_need_search.json' %(folder),'w') as outfile:
-		json.dump(fasta_need_search, outfile)       
-		outfile.write('\n')
+	with open('./dataset/%s/fasta_need_search.txt' %(folder),'w') as outfile:
+		# json.dump(fasta_need_search, outfile)       
+		outfile.write(str(fasta_need_search))
 	outfile.close()
 
 

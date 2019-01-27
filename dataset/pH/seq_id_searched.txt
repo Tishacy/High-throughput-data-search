@@ -1,1 +1,0 @@
-[['k__Bacteria;p__Bacteroidetes;c__Chlorobia;o__Chlorobiales;f__Chlorobiaceae;g__Prosthecochloris', []]]

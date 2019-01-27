@@ -1,21 +1,22 @@
-import json
 import requests
 from bs4 import BeautifulSoup
 from queue import Queue
 from threading import Thread
 import numpy as np
+import time
 
 
 ### ip池
 def get_ip_list():
+	"""获取代理ip池
 	"""
-		获取代理ip池
-	"""
-	url = "https://www.xicidaili.com/wt"
-	headers = {'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36'}
+	url = "https://www.xicidaili.com/wn"
+	headers = {
+		'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36'
+		}
 	res = requests.get(url, headers=headers)
 	html = res.content.decode()
-	# print(html)
+
 	soup = BeautifulSoup(html, 'html.parser')
 	trs = soup.find_all('tr')[1:]
 	ip_list = []
@@ -29,24 +30,34 @@ def get_ip_list():
 
 
 def random_choose_ip(ip_list):
-	"""
-		从代理ip池中随机选择ip
+	"""从代理ip池中随机选择ip
 	"""
 	ip = np.random.choice(ip_list)
 	return ip
 
 
-def searchSeqID(seq):
-	"""
-		POST 数据并获得搜索结果
+def searchSeqID(seq, threshold=0.95):
+	"""搜索基因序列并返回匹配的 sequence ID 
+		params:
+			seq: (str) 基因序列
+			threshold: (float) 搜索的基因匹配程度,范围[0, 1],
+		return:
+			(array) 
+			[[seq_id1, score1],
+			 [seq_id2, score2],
+			 ...,
+			 [seq_idn, scoren]]
 	"""
 	sess = requests.Session()
 	headers = {
 		"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"
 	}
 	sess.headers.update(headers)
-
-	ip = random_choose_ip(ip_list)
+	try:
+		ip = random_choose_ip(ip_list)
+	except:
+		ip_list = get_ip_list()
+		ip = random_choose_ip(ip_list)
 	proxies = {
 		ip.split(':')[0]:ip,
 	}
@@ -65,48 +76,56 @@ def searchSeqID(seq):
 	}
 	url = "http://rdp.cme.msu.edu/seqmatch/SeqmatchControllerServlet/start"
 	res = sess.post(url, data=data, proxies=proxies)
-	print("已发送数据", res)
+	print("已发送数据", res, ip)
+
+	# 必须 Status --> Summary --> Result 的顺序依次访问，否则可能会报错
+	# Status
+	res = sess.get("http://rdp.cme.msu.edu/seqmatch/seqmatch_status.jsp?qvector=12&depth=0&currentRoot=0&num=20",
+					proxies=proxies)
+	print("已获取 Status 页面")
+	# Summary
+	res = sess.get("http://rdp.cme.msu.edu/seqmatch/seqmatch_sum.jsp?qvector=12&depth=0&currentRoot=0&num=20",
+					proxies=proxies)
+	print("已获取 Summaray 页面")
+	# Result
 	res = sess.get('http://rdp.cme.msu.edu/seqmatch/seqmatch_result.jsp?qvector=204&depth=0&currentRoot=0&num=20',
 				    proxies=proxies)
-	html = res.text
+	html = res.content.decode()
 	print("已获取序列比对数据", res)
-	with open('./test_page.html', 'w') as f:
-		f.write(html)
 	
 	# 搜索 match_score 大于等于0.95的序列id
 	soup = BeautifulSoup(html, 'html.parser')
 	detail_html = soup.find('div', {'class':'details'})
 	seq_id_list = [item.text for item in detail_html.find_all('a', {'target':'_blank'})]
 	match_score = np.array([float(item.text) for item in detail_html.find_all('span', {'style':'background-color: #FFDBB8'})[1:]])
-		
 	seq_id_searched = []
-	if True not in (match_score >= 0.95):
-		print('match_score 全部小于0.95')
+	if True not in (match_score >= threshold):
+		print('match_score 全部小于 %.2f' %(threshold))
 	for i, score in enumerate(match_score):
-		if score >= 0.95:
-			seq_id_searched.append(seq_id_list[i])
-	
+		if score >= threshold:
+			seq_id_searched.append([seq_id_list[i], score])
 	return seq_id_searched
 
 
 def searchBatchSeqID(strain_name, fasta_list, queue):
-	"""
-		多线程爬虫的批次任务
+	"""批次任务
 	"""
 	batch_data = [strain_name, []]
 	for i, seq in enumerate(fasta_list):
+		time.sleep(np.random.uniform(0, 3))
 		print("%d " %(i+1), end='')
 		try:
-			batch_data[1].extend(searchSeqID(seq))
+			seq_id_searched = searchSeqID(seq)
 		except:
-			batch_data[1].extend([])
+			seq_id_searched = []
+		batch_data[1].extend(seq_id_searched)
 	queue.put(batch_data)
+	print(batch_data)
 	print("成功获取 %s 的所有 seq_id" %(strain_name))
 
 
 def searchAllSeqID(fasta_need_search):
-	"""
-		多线程爬虫获取全部菌属的匹配的 seq_id
+	"""多线程获取全部菌属的匹配的 seq_id
 	"""
 	queue = Queue()
 	thds = []
@@ -127,17 +146,18 @@ def searchAllSeqID(fasta_need_search):
 
 
 def main(folder):
-	# 读取 fasta_need_search.json 并获得需要搜索的菌属名与序列信息
-	fpath = './dataset/%s/fasta_need_search.json' %(folder)
-	fasta_need_search = json.loads(open(fpath).read())
-	
+	# 读取 fasta_need_search.txt 并获得需要搜索的菌属名与序列信息
+	fpath = './dataset/%s/fasta_need_search.txt' %(folder)
+	with open(fpath, 'r') as f:
+		fasta_need_search = eval(f.read())
+
 	# A test
-	fasta = {"k__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Rhodobacterales;f__Rhodobacteraceae;Other": 
-	["TACGGAGGgggTTAGCGTTGTTCGGAATTACTGGGCGTAAAGCgcgcgTAGGCGGACTAGTCAGTCAGAGGTGAAATCCCAGGGCTCAACCCTGGAACTGCCTTTGATACTGCTGGTCTTGAGTTCGAgagagGTGAGTGGAATTCCGAGTGTAGAGGTGAAATTCGTAGATATTCGGAGGAACACCAGTGGCGAAGGCGGCTCACTGGCTCGATACTGACGCTGAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGATACCCTGGTAGTCCACGCCGTAAACGATGAATGCCAGTCGTCGGGCAGTATACTGTTCGGTGACacacCTAACGGATTAAGCATTCCGCCTG",
-	 "TACGGAGGgggCTAGCGTTGTTCGGAATTACTGGGCGTAAAGCGCACGTAGGCGGACTATTAAGTCAGGGGTGAAATCCCGGGGCTCAACCCCGGAACTGCCTTTGATACTGGTAGTCTAGAGTTCGAgagagGTGAGTGGAACTCCGAGTGTAGAGGTGAAATTCGTAGATATTCGGAAGAACACCAGTGGCGAAGGCGGCTCACTGGCTCGATACTGACGCTGAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGATACCCTGGTAGTCCACGCCGTAAACGATGAATGCCAGACGTCGGCAAGCATGCTTGTCGGTGTCACACCTAACGATTAAGCATTCCGGCCTGGGGAGTACGGTCGCAAGATTA"]}
-	seq_id_searched = searchAllSeqID(fasta)
+	# fasta = {"k__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Rhodobacterales;f__Rhodobacteraceae;Other": 
+	# ["TACGGAGGgggTTAGCGTTGTTCGGAATTACTGGGCGTAAAGCgcgcgTAGGCGGACTAGTCAGTCAGAGGTGAAATCCCAGGGCTCAACCCTGGAACTGCCTTTGATACTGCTGGTCTTGAGTTCGAgagagGTGAGTGGAATTCCGAGTGTAGAGGTGAAATTCGTAGATATTCGGAGGAACACCAGTGGCGAAGGCGGCTCACTGGCTCGATACTGACGCTGAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGATACCCTGGTAGTCCACGCCGTAAACGATGAATGCCAGTCGTCGGGCAGTATACTGTTCGGTGACacacCTAACGGATTAAGCATTCCGCCTG",
+	# "TACGGAGGgggCTAGCGTTGTTCGGAATTACTGGGCGTAAAGCGCACGTAGGCGGACTATTAAGTCAGGGGTGAAATCCCGGGGCTCAACCCCGGAACTGCCTTTGATACTGGTAGTCTAGAGTTCGAgagagGTGAGTGGAACTCCGAGTGTAGAGGTGAAATTCGTAGATATTCGGAAGAACACCAGTGGCGAAGGCGGCTCACTGGCTCGATACTGACGCTGAGGTGCGAAAGCGTGGGGAGCAAACAGGATTAGATACCCTGGTAGTCCACGCCGTAAACGATGAATGCCAGACGTCGGCAAGCATGCTTGTCGGTGTCACACCTAACGATTAAGCATTCCGGCCTGGGGAGTACGGTCGCAAGATTA"]}
+	# seq_id_searched = searchAllSeqID(fasta)
 	
-	# seq_id_searched = searchAllSeqID(fasta_need_search)
+	seq_id_searched = searchAllSeqID(fasta_need_search)
 	with open('./dataset/%s/seq_id_searched.txt' %(folder), 'w') as f:
 		f.write(str(seq_id_searched))
 	f.close()
