@@ -1,5 +1,7 @@
 # High-throughput-data-search
 
+## Introduction
+
 This repo is doing data preparation for SUNXING's graduate design.  All source code are contained in `src` folder. 
 
 - `dataset`: a directory to store the original dataset as well as the code generated files.
@@ -41,3 +43,10 @@ This repo is doing data preparation for SUNXING's graduate design.  All source c
 
    Type the dataset name and return it.
 
+## Requirements
+
+Using `pip` to install all the dependencies required.
+
+```bash
+pip install -r requirements.txt
+```
